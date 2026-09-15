@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Emergency Fund</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f6fa;color:#182033;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:#fff;padding:16px;position:sticky;top:0;border-bottom:1px solid #e6e9ef;z-index:3}
+h1{margin:0;font-size:23px}h2{margin:4px 0 12px}.muted{color:#697386;font-size:13px}
+main{max-width:900px;margin:auto;padding:15px 15px 95px}.screen{display:none}.screen.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card,.box,.member,.req,.tx{background:#fff;border:1px solid #e5e8ef;border-radius:16px;padding:14px;margin:10px 0}
+.big{font-size:21px;font-weight:800;margin-top:4px}.label{font-size:12px;color:#697386}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+button{border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+.primary{background:#2563eb;color:#fff}.ok{background:#dcfce7;color:#166534}.danger{background:#fee2e2;color:#991b1b}.ghost{background:#eef2f7;color:#243047}
+.small{font-size:12px;padding:7px 9px}nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;display:flex;justify-content:center;z-index:4;overflow:auto}
+nav button{background:none;color:#697386;padding:12px 10px;min-width:70px}.sel{color:#2563eb!important}
+input,select,textarea{width:100%;padding:11px;border:1px solid #d9dee8;border-radius:10px;margin:6px 0 10px;font:inherit}
+textarea{min-height:80px;resize:vertical}.pill{font-size:11px;padding:4px 8px;border-radius:99px;background:#eef2ff;white-space:nowrap}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;z-index:10}.modal.on{display:flex}
+.sheet{background:#fff;width:100%;max-width:900px;margin:auto;padding:18px;border-radius:20px 20px 0 0;max-height:90vh;overflow:auto}
+.search{margin:5px 0}.dangerText{color:#b42318}.success{color:#067647}.warning{color:#9a6700}
+.statline{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:8px 0}.statline:last-child{border:0}
+@media(max-width:560px){.grid{grid-template-columns:1fr 1fr}.row{align-items:flex-start}.row>div:last-child{text-align:right}nav button{min-width:64px;font-size:12px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Emergency Fund</h1>
+  <div class="muted" id="who">20 Members • ₹1,000/month • 1% monthly interest</div>
+</header>
+
+<main>
+<section id="login" class="screen on">
+  <div class="box" style="max-width:430px;margin:45px auto">
+    <h2>Login</h2>
+    <select id="role" onchange="updateMemberSelect()"><option>Admin</option><option>Member</option></select>
+    <select id="memberSelect"></select>
+    <input id="pin" type="password" placeholder="Demo PIN: 1234">
+    <button class="primary" style="width:100%" onclick="login()">Login</button>
+    <p class="muted">Demo app: data is stored in this browser/device only.</p>
+  </div>
+</section>
+
+<section id="home" class="screen">
+  <div class="grid">
+    <div class="card"><div class="label">Available Cash</div><div class="big" id="cash">₹0</div></div>
+    <div class="card"><div class="label">Contributions</div><div class="big" id="contrib">₹0</div></div>
+    <div class="card"><div class="label">Outstanding Principal</div><div class="big" id="principal">₹0</div></div>
+    <div class="card"><div class="label">Interest Earned</div><div class="big" id="interest">₹0</div></div>
+  </div>
+  <div class="box">
+    <div class="row"><b>Current month collection</b><b id="paid">0/20</b></div>
+    <p class="muted" id="monthLabel"></p>
+    <button class="primary" onclick="show('members')">Manage payments</button>
+  </div>
+  <div class="box">
+    <div class="row"><b>Pending requests</b><b id="pending">0</b></div>
+    <button class="ghost" onclick="show('requests')">View requests</button>
+  </div>
+  <div class="box">
+    <b>Quick report</b>
+    <div class="statline"><span>Interest received</span><b id="intReceived">₹0</b></div>
+    <div class="statline"><span>Interest outstanding</span><b id="intDue">₹0</b></div>
+  </div>
+</section>
+
+<section id="members" class="screen">
+  <div class="row"><h2>Members</h2><button class="primary" onclick="addMember()">+ Add</button></div>
+  <input class="search" id="memberSearch" placeholder="Search member..." oninput="renderMembers()">
+  <div id="membersList"></div>
+</section>
+
+<section id="requests" class="screen">
+  <div class="row"><h2>Emergency Requests</h2><button class="primary" onclick="requestMoney()">+ Request</button></div>
+  <div class="box"><b>Rule</b><p class="muted">Maximum request = 50% of current available cash. Approved loan earns 1% simple interest per month.</p></div>
+  <div id="requestsList"></div>
+</section>
+
+<section id="fund" class="screen">
+  <h2>Fund & Interest</h2>
+  <div class="grid">
+    <div class="card"><div class="label">Interest Pool Received</div><div class="big" id="pool">₹0</div></div>
+    <div class="card"><div class="label">Equal Share</div><div class="big" id="share">₹0</div></div>
+  </div>
+  <div class="box">
+    <b>Add interest received</b>
+    <input id="intAmt" type="number" min="1" placeholder="₹">
+    <button class="primary" onclick="addInterest()">Add</button>
+  </div>
+  <div class="box">
+    <b>Monthly management</b>
+    <p class="muted">New month is detected automatically. Previous months remain in history.</p>
+    <button class="ghost" onclick="startNewMonth()">Start/confirm current month</button>
+  </div>
+  <div id="txList"></div>
+</section>
+
+<section id="profile" class="screen">
+  <h2>Profile</h2>
+  <div class="box" id="profileBox"></div>
+  <div class="box">
+    <b>Backup & Restore</b>
+    <p class="muted">Download a backup before changing browser/device.</p>
+    <button class="primary" onclick="backup()">Backup</button>
+    <button class="ghost" onclick="restorePick()">Restore</button>
+    <input id="restoreFile" type="file" accept=".json,application/json" style="display:none" onchange="restoreFile(event)">
+  </div>
+  <button class="danger" onclick="logout()">Logout</button>
+</section>
+</main>
+
+<nav>
+<button class="sel" onclick="show('home',this)">Home</button>
+<button onclick="show('members',this)">Members</button>
+<button onclick="show('requests',this)">Emergency</button>
+<button onclick="show('fund',this)">Fund</button>
+<button onclick="show('profile',this)">Profile</button>
+</nav>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <div class="row"><h2 id="mt"></h2><button class="ghost" onclick="closeModal()">Close</button></div>
+    <div id="mb"></div>
+  </div>
+</div>
+
+<script>
+const KEY='EF_FINAL_V1', OLD_KEY='EF_V3', MONTHLY=1000, RATE=.01, MAX=20;
+let s=loadState();
+
+function fresh(){
+  return {members:Array.from({length:20},(_,i)=>({name:'Member '+(i+1),payments:{},loans:[]})),
+    requests:[],tx:[],user:null,currentMonth:monthKey(),version:1};
+}
+function monthKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function monthName(k){let [y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'})}
+function loadState(){
+  let x=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(x)return normalize(x);
+  let old=JSON.parse(localStorage.getItem(OLD_KEY)||'null');
+  if(old){
+    let n=fresh();
+    n.user=old.user||null;n.requests=old.requests||[];n.tx=old.tx||[];
+    n.members=(old.members||[]).map((m,i)=>({name:m.name||('Member '+(i+1)),payments:{[old.month||monthKey()]:!!m.paid},loans:(m.loans||[]).map(l=>({amount:+l.amount||0,repaid:+l.repaid||0,interestRepaid:+l.interestRepaid||0,startDate:l.startDate||new Date().toISOString()}))}));
+    while(n.members.length<20)n.members.push({name:'Member '+(n.members.length+1),payments:{},loans:[]});
+    n.members=n.members.slice(0,20);return n;
+  }
+  return fresh();
+}
+function normalize(x){
+  x.members=x.members||[];x.requests=x.requests||[];x.tx=x.tx||[];x.currentMonth=x.currentMonth||monthKey();
+  x.members=x.members.map((m,i)=>({name:m.name||('Member '+(i+1)),payments:m.payments||{},loans:(m.loans||[]).map(l=>({amount:+l.amount||0,repaid:+l.repaid||0,interestRepaid:+l.interestRepaid||0,startDate:l.startDate||new Date().toISOString()}))}));
+  return x;
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(s));render()}
+function money(n){return '₹'+Math.round(n||0).toLocaleString('en-IN')}
+function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function ensureMonth(){
+  let now=monthKey();
+  if(s.currentMonth!==now){
+    s.currentMonth=now;
+    s.members.forEach(m=>{m.payments=m.payments||{}});
+    localStorage.setItem(KEY,JSON.stringify(s));
+  }
+}
+function paid(m){return !!(m.payments||{})[s.currentMonth]}
+function contributionTotal(){
+  return s.members.reduce((a,m)=>a+Object.values(m.payments||{}).filter(Boolean).length*MONTHLY,0);
+}
+function outstandingPrincipal(){
+  return s.members.reduce((a,m)=>a+m.loans.reduce((b,l)=>b+Math.max(0,l.amount-l.repaid),0),0);
+}
+function interestDueLoan(l){
+  let start=new Date(l.startDate||Date.now()), now=new Date(), months=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
+  months=Math.max(1,months);
+  return Math.round(Math.max(0,l.amount-l.repaid)*RATE*months);
+}
+function totalInterestDue(){
+  return s.members.reduce((a,m)=>a+m.loans.reduce((b,l)=>b+Math.max(0,interestDueLoan(l)-(l.interestRepaid||0)),0),0);
+}
+function interestReceived(){return s.tx.filter(x=>x.type==='Interest Received').reduce((a,x)=>a+(+x.amount||0),0)}
+function interestRepayments(){return s.tx.filter(x=>x.type==='Interest Repayment').reduce((a,x)=>a+(+x.amount||0),0)}
+function principalRepayments(){return s.tx.filter(x=>x.type==='Principal Repayment').reduce((a,x)=>a+(+x.amount||0),0)}
+function loanDisbursed(){return s.tx.filter(x=>x.type==='Emergency Loan').reduce((a,x)=>a+(+x.amount||0),0)}
+function availableCash(){
+  return contributionTotal()+interestReceived()+principalRepayments()+interestRepayments()-loanDisbursed();
+}
+function calc(){return {c:contributionTotal(),out:outstandingPrincipal(),interest:interestReceived()+interestRepayments(),cash:availableCash(),received:interestReceived(),due:totalInterestDue()}}
+function login(){
+  if(pin.value!=='1234')return alert('Demo PIN: 1234');
+  s.user={role:role.value,index:role.value==='Admin'?null:+memberSelect.value};save();show('home')
+}
+function logout(){s.user=null;save();show('login')}
+function updateMemberSelect(){
+  memberSelect.style.display=role.value==='Member'?'block':'none';
+  memberSelect.innerHTML=s.members.map((m,i)=>`<option value="${i}">${esc(m.name)}</option>`).join('');
+}
+function show(id,btn){
+  if(!s.user&&id!=='login')return show('login');
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('sel'));
+  if(btn)btn.classList.add('sel');render();
+}
+function openModal(title,body){mt.textContent=title;mb.innerHTML=body;modal.classList.add('on')}
+function closeModal(){modal.classList.remove('on')}
+
+function addMember(){
+  if(s.user?.role!=='Admin')return alert('Admin only');
+  if(s.members.length>=MAX)return alert('Maximum 20 members allowed');
+  openModal('Add member',`<input id="newName" placeholder="Member name"><button class="primary" onclick="saveMember()">Save</button>`);
+}
+function saveMember(){
+  let n=newName.value.trim();if(!n)return;
+  s.members.push({name:n,payments:{},loans:[]});closeModal();save();
+}
+function togglePay(i){
+  if(s.user?.role!=='Admin')return alert('Admin only');
+  s.members[i].payments[s.currentMonth]=!paid(s.members[i]);
+  s.tx.push({type:paid(s.members[i])?'Contribution Received':'Contribution Marked Unpaid',amount:paid(s.members[i])?MONTHLY:0,note:s.members[i].name,month:s.currentMonth,date:new Date().toISOString()});
+  save();
+}
+function startNewMonth(){
+  ensureMonth();alert('Current month: '+monthName(s.currentMonth)+'\\nPayments from previous months are kept in history.');render();
+}
+function requestMoney(){
+  if(!s.user)return;
+  let mi=s.user.role==='Admin'?null:s.user.index;
+  openModal('Emergency request',`
+    ${s.user.role==='Admin'?`<select id="reqMember">${s.members.map((m,i)=>`<option value="${i}">${esc(m.name)}</option>`).join('')}</select>`:''}
+    <input id="reqAmt" type="number" min="1" placeholder="Amount">
+    <textarea id="reqReason" placeholder="Reason"></textarea>
+    <p class="muted">Current max: ${money(Math.max(0,availableCash()*0.5))}</p>
+    <button class="primary" onclick="saveRequest()">Submit request</button>`);
+}
+function saveRequest(){
+  let member=s.user.role==='Admin'?+reqMember.value:s.user.index,a=+reqAmt.value,n=reqReason.value.trim(),max=Math.floor(availableCash()*0.5);
+  if(!a||a>max)return alert('Amount must be between ₹1 and '+money(max));
+  s.requests.push({member,amount:a,note:n,status:'Pending',date:new Date().toISOString()});closeModal();save();
+}
+function approve(i){
+  if(s.user?.role!=='Admin')return;
+  let r=s.requests[i];if(!r||r.status!=='Pending')return;
+  if(r.amount>availableCash())return alert('Not enough available cash');
+  r.status='Approved';r.approvedDate=new Date().toISOString();
+  s.members[r.member].loans.push({amount:r.amount,repaid:0,interestRepaid:0,startDate:r.approvedDate});
+  s.tx.push({type:'Emergency Loan',amount:r.amount,note:s.members[r.member].name,date:new Date().toISOString()});
+  save();
+}
+function reject(i){
+  if(s.user?.role!=='Admin')return;
+  if(s.requests[i])s.requests[i].status='Rejected';save();
+}
+function repay(mi,li){
+  if(s.user?.role!=='Member'&&s.user?.role!=='Admin')return alert('Login required');
+  let l=s.members[mi].loans[li],due=Math.max(0,l.amount-l.repaid);
+  if(due<=0)return alert('Principal already repaid');
+  let a=+prompt('Principal repayment (max '+money(due)+')',due);
+  if(!a||a>due)return;
+  l.repaid=(l.repaid||0)+a;
+  s.tx.push({type:'Principal Repayment',amount:a,note:s.members[mi].name,date:new Date().toISOString()});save();
+}
+function repayInterest(mi,li){
+  if(s.user?.role!=='Member'&&s.user?.role!=='Admin')return alert('Login required');
+  let l=s.members[mi].loans[li],due=Math.max(0,interestDueLoan(l)-(l.interestRepaid||0));
+  if(due<=0)return alert('Interest already repaid');
+  let a=+prompt('Interest repayment (max '+money(due)+')',due);
+  if(!a||a>due)return;
+  l.interestRepaid=(l.interestRepaid||0)+a;
+  s.tx.push({type:'Interest Repayment',amount:a,note:s.members[mi].name,date:new Date().toISOString()});save();
+}
+function addInterest(){
+  if(s.user?.role!=='Admin')return alert('Admin only');
+  let a=+intAmt.value;if(!a||a<1)return alert('Enter amount');
+  s.tx.push({type:'Interest Received',amount:a,note:'Interest received',date:new Date().toISOString()});intAmt.value='';save();
+}
+function renderMembers(){
+  if(!s.user)return;
+  let q=(memberSearch?.value||'').toLowerCase().trim();
+  let arr=s.members.map((m,i)=>({m,i})).filter(x=>x.m.name.toLowerCase().includes(q));
+  membersList.innerHTML=arr.map(({m,i})=>{
+    let out=m.loans.reduce((a,l)=>a+Math.max(0,l.amount-l.repaid),0),idue=m.loans.reduce((a,l)=>a+Math.max(0,interestDueLoan(l)-(l.interestRepaid||0)),0);
+    return `<div class="member"><div class="row"><div><b>${esc(m.name)}</b><div class="muted">This month: ${paid(m)?'Paid':'Due'} • Principal: ${money(out)} • Interest due: ${money(idue)}</div></div>${s.user.role==='Admin'?`<button class="${paid(m)?'ok':'primary'} small" onclick="togglePay(${i})">${paid(m)?'Paid':'Mark paid'}</button>`:''}</div></div>`;
+  }).join('')||'<div class="box">No member found.</div>';
+}
+function renderRequests(){
+  requestsList.innerHTML=s.requests.length?s.requests.slice().reverse().map((r,rev)=>{
+    let i=s.requests.length-1-rev;
+    return `<div class="req"><div class="row"><b>${esc(s.members[r.member]?.name||'Member')}</b><span class="pill">${esc(r.status)}</span></div>
+    <div class="muted">${money(r.amount)} • ${esc(r.note||'No reason')}<br>${r.date?new Date(r.date).toLocaleString('en-IN'):''}</div>
+    ${r.status==='Pending'&&s.user.role==='Admin'?`<div style="margin-top:8px"><button class="ok" onclick="approve(${i})">Approve</button> <button class="danger" onclick="reject(${i})">Reject</button></div>`:''}</div>`
+  }).join(''):'<div class="box">No requests.</div>';
+}
+function renderTx(){
+  txList.innerHTML=s.tx.length?s.tx.slice().reverse().map(x=>`<div class="tx row"><span><b>${esc(x.type)}</b><div class="muted">${esc(x.note||'')} ${x.date?'• '+new Date(x.date).toLocaleDateString('en-IN'):''}</div></span><b>${money(x.amount)}</b></div>`).join(''):'<div class="box">No transactions.</div>';
+}
+function renderProfile(t){
+  if(s.user.role==='Admin'){
+    profileBox.innerHTML=`<b>Administrator</b><div class="muted">Can manage payments, approve requests, manage interest and backups.</div>
+    <div class="statline"><span>Members</span><b>${s.members.length}</b></div><div class="statline"><span>Available cash</span><b>${money(t.cash)}</b></div>`;
+    return;
+  }
+  let p=s.members[s.user.index];
+  profileBox.innerHTML=`<b>${esc(p.name)}</b><div class="muted">Current month: ${monthName(s.currentMonth)} • Contribution: ${paid(p)?'Paid':'Due'}</div>
+  <div style="margin-top:8px">Interest share: ${money(t.received/Math.max(1,s.members.length))}</div>
+  ${p.loans.length?p.loans.map((l,i)=>{
+    let pd=Math.max(0,l.amount-l.repaid),id=Math.max(0,interestDueLoan(l)-(l.interestRepaid||0));
+    return `<div class="box"><b>Loan ${i+1}</b><br>Loan amount: ${money(l.amount)}<br>Principal due: ${money(pd)}<br>Interest due: ${money(id)}
+    <div style="margin-top:8px">${pd?`<button class="ghost" onclick="repay(${s.user.index},${i})">Repay principal</button>`:''}
+    ${id?`<button class="primary" onclick="repayInterest(${s.user.index},${i})">Repay Interest</button>`:''}</div></div>`
+  }).join(''):'<p class="muted">No loans.</p>'}`;
+}
+function render(){
+  ensureMonth();updateMemberSelect();
+  if(!s.user){who.textContent='20 Members • ₹1,000/month • 1% monthly interest';return}
+  let t=calc();
+  who.textContent=s.user.role==='Admin'?'Admin':'Member • '+(s.members[s.user.index]?.name||'Member');
+  cash.textContent=money(t.cash);contrib.textContent=money(t.c);principal.textContent=money(t.out);interest.textContent=money(t.interest);
+  paid.textContent=s.members.filter(m=>paid(m)).length+'/'+s.members.length;
+  pending.textContent=s.requests.filter(r=>r.status==='Pending').length;
+  monthLabel.textContent='Current month: '+monthName(s.currentMonth)+' • ₹1,000 per member';
+  intReceived.textContent=money(t.received);intDue.textContent=money(t.due);
+  pool.textContent=money(t.received);share.textContent=money(t.received/Math.max(1,s.members.length));
+  renderMembers();renderRequests();renderTx();renderProfile(t);
+}
+function backup(){
+  let data={...s,user:null,backupDate:new Date().toISOString()};
+  let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='emergency-fund-backup-'+monthKey()+'.json';a.click();URL.revokeObjectURL(url);
+}
+function restorePick(){
+  if(s.user?.role!=='Admin')return alert('Admin only');
+  restoreFileInput.click();
+}
+function restoreFile(e){
+  let f=e.target.files[0];if(!f)return;
+  let r=new FileReader();
+  r.onload=()=>{try{let x=JSON.parse(r.result);if(!x.members||!Array.isArray(x.members))throw Error();
+    if(!confirm('Restore backup? Current data will be replaced.'))return;
+    s=normalize(x);s.user={role:'Admin',index:null};save();alert('Backup restored');show('home');
+  }catch(_){alert('Invalid backup file')}};
+  r.readAsText(f);e.target.value='';
+}
+const restoreFileInput=document.getElementById('restoreFile');
+render();
+</script>
+</body>
+</html>
